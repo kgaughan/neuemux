@@ -14,6 +14,7 @@ import os.path
 import sys
 
 import diesel
+import diesel.util.queue
 import docopt
 import ipaddr
 import twiggy
@@ -81,6 +82,13 @@ class Config(ConfigParser.RawConfigParser):
                 self.set(section, key, value)
 
 
+def start_client(server, queue, config, config_path):
+    """
+    Start a client agent to manage a connection to the given server.
+    """
+    return None
+
+
 def main():
     """
     Execute the daemon.
@@ -124,10 +132,11 @@ def main():
         print >> sys.stderr, str(exc)
         return 1
 
-    logger.info('Listening on {0}:{1}', addr, port)
-    service = diesel.Service(respond, port, addr)
+    queue = diesel.util.queue.Queue()
+    downstream = start_client(opts['SERVER'], queue, config, config_dir)
 
-    diesel.quickstart(service)
+    logger.info('Listening on {0}:{1}', addr, port)
+    diesel.quickstart(diesel.Service(respond, port, addr), downstream)
     return 0
 
 

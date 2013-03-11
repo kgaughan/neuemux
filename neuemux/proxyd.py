@@ -11,7 +11,9 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 import ConfigParser
 import sys
 
+import diesel
 import docopt
+import ipaddr
 import twiggy
 import twiggy.levels
 
@@ -22,7 +24,7 @@ USAGE = """
 An EPP reverse proxy.
 
 Usage:
-  epp-proxyd SERVER [--config=PATH] [--iface=IFACE] [--port=PORT]
+  epp-proxyd SERVER [--config=PATH] [--addr=ADDR] [--port=PORT]
   epp-proxyd -h | --help
   epp-proxyd --version
 
@@ -31,7 +33,7 @@ Options:
   --version      Show version.
   --config=PATH  Configuration file to use.
                  [default: /etc/neuemux/proxyd.ini]
-  --iface=IFACE  Interface to bind to.
+  --addr=ADDR    Interface address to bind to.
                  [default: 127.0.0.1]
   --port=PORT    Port to listen on when bound.
                  [default: 700]
@@ -54,6 +56,13 @@ DEFAULTS = {
 }
 
 logger = twiggy.log.name('neuemux.proxyd')
+
+
+def respond(addr):
+    """
+    A very basic responder to make sure everything works.
+    """
+    diesel.send('Hello, %s:%d!\n' % addr)
 
 
 class Config(ConfigParser.RawConfigParser):
@@ -83,6 +92,33 @@ def main():
         config.get('common', 'log_level'))
     if not has_config:
         logger.warning('Config file {0} not found', opts['--config'])
+
+    # Check the options for well-formedness.
+    try:
+        # Will raise a ValueError if it's malformed.
+        ipaddr.IPAddress(opts['--addr'])
+        addr = opts['--addr']
+
+        try:
+            port = int(opts['--port'])
+        except ValueError:
+            raise ValueError('Bad port number: "%s"' % opts['--port'])
+        if not 0 <= int(opts['--port']) < 65536:
+            raise ValueError('Bad port number: "%d"' % port)
+
+        for prefix in ('server:', 'derive:'):
+            if config.has_section(prefix + opts['SERVER']):
+                break
+        else:
+            raise ValueError("No such server: '%s'" % opts['SERVER'])
+    except ValueError, exc:
+        print >> sys.stderr, str(exc)
+        return 1
+
+    logger.info('Listening on {0}:{1}', addr, port)
+    service = diesel.Service(respond, port, addr)
+
+    diesel.quickstart(service)
     return 0
 
 

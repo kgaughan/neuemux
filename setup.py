@@ -23,13 +23,20 @@ setup(
 
     entry_points={
         'console_scripts': [
+            'epp-proxyd = neuemux.proxyd:main',
+            'epp-muxd = neuemux.muxd:main',
         ],
     },
 
     classifiers=[
+        'Development Status :: 2 - Pre-Alpha',
+        'Environment :: No Input/Output (Daemon)',
+        'Intended Audience :: System Administrators',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'Topic :: Internet',
+        'Topic :: System :: Networking',
     ],
 
     author=META['author'],

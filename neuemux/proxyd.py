@@ -9,6 +9,8 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 """
 
 import ConfigParser
+import glob
+import os.path
 import sys
 
 import diesel
@@ -92,6 +94,13 @@ def main():
         config.get('common', 'log_level'))
     if not has_config:
         logger.warning('Config file {0} not found', opts['--config'])
+
+    # Load in any additional config files.
+    if config.has_option('include', 'files'):
+        config.read(glob.glob(config.get('include', 'files')))
+
+    # Needed later for path expansion.
+    config_dir = os.path.dirname(os.path.realpath(opts['--config']))
 
     # Check the options for well-formedness.
     try:

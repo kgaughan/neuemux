@@ -9,12 +9,13 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 """
 
 import ConfigParser
+import functools
 import glob
 import os.path
 import sys
 
 import diesel
-import diesel.util.queue
+from diesel.util import queue
 import docopt
 import ipaddr
 import twiggy
@@ -61,11 +62,29 @@ DEFAULTS = {
 logger = twiggy.log.name('neuemux.proxyd')
 
 
-def respond(addr):
+def respond(request_queue, addr):
     """
-    A very basic responder to make sure everything works.
     """
+    response_queue = queue.Queue()
+
+    # Send the greeting to the client.
+    request_queue.put(('greeting', None, response_queue))
+    diesel.send(response_queue.get())
+
+    # Fake authentication.
+
+    while True:
+        # Process requests till
+        pass
+
     diesel.send('Hello, %s:%d!\n' % addr)
+
+
+def start_client(server, request_queue, config, config_path):
+    """
+    Start a client agent to manage a connection to the given server.
+    """
+    return None
 
 
 class Config(ConfigParser.RawConfigParser):
@@ -80,13 +99,6 @@ class Config(ConfigParser.RawConfigParser):
             self.add_section(section)
             for key, value in kvs.iteritems():
                 self.set(section, key, value)
-
-
-def start_client(server, queue, config, config_path):
-    """
-    Start a client agent to manage a connection to the given server.
-    """
-    return None
 
 
 def main():
@@ -132,11 +144,23 @@ def main():
         print >> sys.stderr, str(exc)
         return 1
 
-    queue = diesel.util.queue.Queue()
-    downstream = start_client(opts['SERVER'], queue, config, config_dir)
+    request_queue = queue.Queue()
+    downstream = start_client(
+        opts['SERVER'],
+        request_queue,
+        config,
+        config_dir,
+    )
 
     logger.info('Listening on {0}:{1}', addr, port)
-    diesel.quickstart(diesel.Service(respond, port, addr), downstream)
+    diesel.quickstart(
+        diesel.Service(
+            functools.partial(respond, request_queue),
+            port,
+            addr,
+        ),
+        downstream,
+    )
     return 0
 
 

@@ -2,7 +2,41 @@
 Utilities.
 """
 
+import ConfigParser
+import contextlib
+import glob
+import logging.config
 import re
+try:
+    import cStringIO as stringio
+except ImportError:
+    import StringIO as stringio
+
+
+def load_configuration(defaults=None, config_path=None):
+    """
+    Load configuration.
+    """
+    config = ConfigParser.SafeConfigParser()
+
+    # Defaults, if any.
+    if defaults is not None:
+        with contextlib.closing(stringio.StringIO(defaults)) as fp:
+            config.readfp(fp)
+
+    # Main configuration file, if any.
+    if config_path is None:
+        # Ensure logging is at least configured to a minimum level.
+        logging.basicConfig()
+    else:
+        config.read(config_path)
+        logging.config.fileConfig(config_path)
+
+    # Load in any additional config files.
+    if config.has_option('include', 'files'):
+        config.read(glob.glob(config.get('include', 'files')))
+
+    return config
 
 
 OBJECT_REF_PATTERN = re.compile(r"""

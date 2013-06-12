@@ -1,4 +1,2 @@
-diesel
 docopt
-twiggy
 ipaddr

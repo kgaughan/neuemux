@@ -8,19 +8,17 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 .. _RFC 5734: http://tools.ietf.org/html/rfc5734
 """
 
-import ConfigParser
-import functools
-import glob
-import os.path
+import asyncore
+import collections
+import logging
+import socket
+import struct
 import sys
 
-import diesel
-from diesel.util import queue
 import docopt
 import ipaddr
-import twiggy
-import twiggy.levels
 
+from neuemux import utils
 from neuemux.version import __version__
 
 
@@ -43,62 +41,100 @@ Options:
                  [default: 700]
 """
 
-DEFAULTS = {
-    'common': {
-        'namespaces': '\n'.join([
-            'urn:ietf:params:xml:ns:epp-1.0',
-            'urn:ietf:params:xml:ns:domain-1.0',
-            'urn:ietf:params:xml:ns:host-1.0',
-            'urn:ietf:params:xml:ns:contact-1.0',
-            'urn:ietf:params:xml:ns:secDNS-1.0',
-            'urn:ietf:params:xml:ns:secDNS-1.1',
-            'urn:ietf:params:xml:ns:e164epp-1.0',
-            'urn:ietf:params:xml:ns:rgp-1.0',
-        ]),
-        'log_level': 'INFO',
-    },
-}
+DEFAULTS = """
+[common]
+namespaces=
+    urn:ietf:params:xml:ns:epp-1.0
+    urn:ietf:params:xml:ns:domain-1.0
+    urn:ietf:params:xml:ns:host-1.0
+    urn:ietf:params:xml:ns:contact-1.0
+    urn:ietf:params:xml:ns:secDNS-1.0
+    urn:ietf:params:xml:ns:secDNS-1.1
+    urn:ietf:params:xml:ns:e164epp-1.0
+    urn:ietf:params:xml:ns:rgp-1.0
+"""
 
-logger = twiggy.log.name('neuemux.proxyd')
+logger = logging.getLogger('neuemux.proxyd')
 
 
-def respond(request_queue, addr):
+class Channel(asyncore.dispatcher):
     """
     """
-    response_queue = queue.Queue()
 
-    # Send the greeting to the client.
-    request_queue.put(('greeting', None, response_queue))
-    diesel.send(response_queue.get())
+    READING_LENGTH = 0
+    READING_PAYLOAD = 1
 
-    # Fake authentication.
+    def __init__(self, sock):
+        asyncore.dispatcher.__init__(self, sock)
 
-    while True:
-        # Process requests till
+        self.read_buffer = []
+        self.write_buffer = collections.deque()
+
+        # `state` refers to the current state we're at in the state machine,
+        # and `remaining` refers to the number of bytes remaining to read
+        # while in this state. We start off reading the length of a data unit,
+        # and the the length is represented as a 32-bit network order integer,
+        # thus it's four bytes long.
+        self.state = self.READING_LENGTH
+        self.remaining = 4
+
+    def handle_read(self):
+        chunk = self.recv(self.remaining)
+        if chunk:
+            self.remaining -= len(chunk)
+            self.read_buffer.append(chunk)
+            if self.remaining == 0:
+                chunk = ''.join(self.read_buffer)
+                self.read_buffer = []
+                if self.state == self.READING_LENGTH:
+                    self.state = self.READING_PAYLOAD
+                    self.remaining, = struct.unpack('!I', chunk)
+                elif self.state == self.READING_PAYLOAD:
+                    self.state = self.READING_LENGTH
+                    self.remaining = 4
+                    self.on_read_frame(chunk)
+
+    def writable(self):
+        return len(self.write_buffer) > 0
+
+    def handle_write(self):
+        while len(self.write_buffer) > 0:
+            head = self.write_buffer.popleft()
+            sent = self.send(head)
+            if sent != len(head):
+                self.write_buffer.appendleft(head[sent:])
+                break
+
+    def on_read_frame(self, frame):
+        """
+        Triggered when a complete frame has been read.
+        """
         pass
 
-    diesel.send('Hello, %s:%d!\n' % addr)
+    def write_frame(self, frame):
+        """
+        Write a frame to this channel.
+        """
+        self.write_buffer.append(struct.pack('!I', len(frame)) + frame)
 
 
-def start_client(server, request_queue, config, config_path):
+class Acceptor(asyncore.dispatcher):
     """
-    Start a client agent to manage a connection to the given server.
-    """
-    return None
-
-
-class Config(ConfigParser.RawConfigParser):
-    """
-    A version of `ConfigParser.RawConfigParser` that sets up default values
-    and sections.
+    Accepts incoming requests, spawning dispatchers to deal with them.
     """
 
-    def __init__(self, defaults):
-        ConfigParser.RawConfigParser.__init__(self)
-        for section, kvs in defaults.iteritems():
-            self.add_section(section)
-            for key, value in kvs.iteritems():
-                self.set(section, key, value)
+    def __init__(self, host, port):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.set_reuse_addr()
+        self.bind((host, port))
+        self.listen(5)
+
+    def handle_accept(self):
+        pair = self.accept()
+        if pair is not None:
+            sock, addr = pair
+            logger.info('Incoming connection from %s', repr(addr))
 
 
 def main():
@@ -107,20 +143,7 @@ def main():
     """
     opts = docopt.docopt(USAGE, sys.argv[1:], version=__version__)
 
-    # Load the configuration and set up logging.
-    config = Config(DEFAULTS)
-    has_config = len(config.read(opts['--config'])) > 0
-    logger.min_level = twiggy.levels.name2level(
-        config.get('common', 'log_level'))
-    if not has_config:
-        logger.warning('Config file {0} not found', opts['--config'])
-
-    # Load in any additional config files.
-    if config.has_option('include', 'files'):
-        config.read(glob.glob(config.get('include', 'files')))
-
-    # Needed later for path expansion.
-    config_dir = os.path.dirname(os.path.realpath(opts['--config']))
+    config = utils.load_configuration(DEFAULTS, opts['--config'])
 
     # Check the options for well-formedness.
     try:
@@ -144,23 +167,10 @@ def main():
         print >> sys.stderr, str(exc)
         return 1
 
-    request_queue = queue.Queue()
-    downstream = start_client(
-        opts['SERVER'],
-        request_queue,
-        config,
-        config_dir,
-    )
+    # config_dir = os.path.dirname(os.path.realpath(opts['--config']))
 
-    logger.info('Listening on {0}:{1}', addr, port)
-    diesel.quickstart(
-        diesel.Service(
-            functools.partial(respond, request_queue),
-            port,
-            addr,
-        ),
-        downstream,
-    )
+    Acceptor(addr, port)
+    asyncore.loop()
     return 0
 
 

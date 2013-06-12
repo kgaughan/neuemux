@@ -89,6 +89,7 @@ class Channel(asyncore.dispatcher):
                 if self.state == self.READING_LENGTH:
                     self.state = self.READING_PAYLOAD
                     self.remaining, = struct.unpack('!I', chunk)
+                    self.remaining -= 4
                 elif self.state == self.READING_PAYLOAD:
                     self.state = self.READING_LENGTH
                     self.remaining = 4
@@ -115,7 +116,7 @@ class Channel(asyncore.dispatcher):
         """
         Write a frame to this channel.
         """
-        self.write_buffer.append(struct.pack('!I', len(frame)) + frame)
+        self.write_buffer.append(struct.pack('!I', len(frame) + 4) + frame)
 
 
 class Acceptor(asyncore.dispatcher):

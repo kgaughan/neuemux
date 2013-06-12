@@ -9,16 +9,13 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 """
 
 import asyncore
-import collections
 import logging
-import socket
-import struct
 import sys
 
 import docopt
 import ipaddr
 
-from neuemux import utils
+from neuemux import protocols, utils
 from neuemux.version import __version__
 
 
@@ -26,7 +23,7 @@ USAGE = """
 An EPP reverse proxy.
 
 Usage:
-  epp-proxyd SERVER [--config=PATH] [--addr=ADDR] [--port=PORT]
+  epp-proxyd SERVER [--config=PATH] [--bind=ADDR] [--port=PORT]
   epp-proxyd -h | --help
   epp-proxyd --version
 
@@ -35,7 +32,7 @@ Options:
   --version      Show version.
   --config=PATH  Configuration file to use.
                  [default: /etc/neuemux/proxyd.ini]
-  --addr=ADDR    Interface address to bind to.
+  --bind=ADDR    Interface address to bind to.
                  [default: 127.0.0.1]
   --port=PORT    Port to listen on when bound.
                  [default: 700]
@@ -57,79 +54,10 @@ namespaces=
 logger = logging.getLogger('neuemux.proxyd')
 
 
-class Channel(asyncore.dispatcher):
+class Listener(protocols.Listener):
     """
+    Listener for proxyd.
     """
-
-    READING_LENGTH = 0
-    READING_PAYLOAD = 1
-
-    def __init__(self, sock):
-        asyncore.dispatcher.__init__(self, sock)
-
-        self.read_buffer = []
-        self.write_buffer = collections.deque()
-
-        # `state` refers to the current state we're at in the state machine,
-        # and `remaining` refers to the number of bytes remaining to read
-        # while in this state. We start off reading the length of a data unit,
-        # and the the length is represented as a 32-bit network order integer,
-        # thus it's four bytes long.
-        self.state = self.READING_LENGTH
-        self.remaining = 4
-
-    def handle_read(self):
-        chunk = self.recv(self.remaining)
-        if chunk:
-            self.remaining -= len(chunk)
-            self.read_buffer.append(chunk)
-            if self.remaining == 0:
-                chunk = ''.join(self.read_buffer)
-                self.read_buffer = []
-                if self.state == self.READING_LENGTH:
-                    self.state = self.READING_PAYLOAD
-                    self.remaining, = struct.unpack('!I', chunk)
-                    self.remaining -= 4
-                elif self.state == self.READING_PAYLOAD:
-                    self.state = self.READING_LENGTH
-                    self.remaining = 4
-                    self.on_read_frame(chunk)
-
-    def writable(self):
-        return len(self.write_buffer) > 0
-
-    def handle_write(self):
-        while len(self.write_buffer) > 0:
-            head = self.write_buffer.popleft()
-            sent = self.send(head)
-            if sent != len(head):
-                self.write_buffer.appendleft(head[sent:])
-                break
-
-    def on_read_frame(self, frame):
-        """
-        Triggered when a complete frame has been read.
-        """
-        pass
-
-    def write_frame(self, frame):
-        """
-        Write a frame to this channel.
-        """
-        self.write_buffer.append(struct.pack('!I', len(frame) + 4) + frame)
-
-
-class Acceptor(asyncore.dispatcher):
-    """
-    Accepts incoming requests, spawning dispatchers to deal with them.
-    """
-
-    def __init__(self, host, port):
-        asyncore.dispatcher.__init__(self)
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.set_reuse_addr()
-        self.bind((host, port))
-        self.listen(5)
 
     def handle_accept(self):
         pair = self.accept()
@@ -149,8 +77,8 @@ def main():
     # Check the options for well-formedness.
     try:
         # Will raise a ValueError if it's malformed.
-        ipaddr.IPAddress(opts['--addr'])
-        addr = opts['--addr']
+        ipaddr.IPAddress(opts['--bind'])
+        addr = opts['--bind']
 
         try:
             port = int(opts['--port'])
@@ -170,7 +98,7 @@ def main():
 
     # config_dir = os.path.dirname(os.path.realpath(opts['--config']))
 
-    Acceptor(addr, port)
+    Listener(addr, port)
     asyncore.loop()
     return 0
 

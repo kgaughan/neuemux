@@ -1,5 +1,5 @@
 """
-
+Various dispatchers implementing protocols.
 """
 
 import asyncore

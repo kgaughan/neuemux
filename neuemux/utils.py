@@ -5,6 +5,7 @@ Utilities.
 import ConfigParser
 import contextlib
 import glob
+import logging
 import logging.config
 import re
 try:

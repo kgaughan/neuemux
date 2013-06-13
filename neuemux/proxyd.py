@@ -10,6 +10,7 @@ connection. Thus it uses the wire protocol outlined in `RFC 5734`_ exclusively.
 
 import asyncore
 import logging
+import os.path
 import sys
 
 import docopt
@@ -71,6 +72,10 @@ def main():
     Execute the daemon.
     """
     opts = docopt.docopt(USAGE, sys.argv[1:], version=__version__)
+
+    if not os.path.isfile(opts['--config']):
+        print >> sys.stderr, "Configuration not found: %s" % opts['--config']
+        return 1
 
     config = utils.load_configuration(DEFAULTS, opts['--config'])
 

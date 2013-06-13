@@ -40,6 +40,33 @@ def load_configuration(defaults=None, config_path=None):
     return config
 
 
+class LoopDetected(Exception):
+    """
+    Loop detected in configuration.
+    """
+
+
+def get_nested_config(config, prefix, name):
+    """
+    Extract the given named config.
+    """
+    walked = set()
+    result = {}
+    while name is not None:
+        section = prefix + ':' + name
+        walked.add(name)
+        next_name = None
+        for key, value in config.items(section):
+            if key == '_base':
+                next_name = value
+                if next_name in walked:
+                    raise LoopDetected("Config loop found for '%s'" % section)
+            elif key not in result:
+                result[key] = value
+        name = next_name
+    return result
+
+
 OBJECT_REF_PATTERN = re.compile(r"""
     ^
     (?P<module>

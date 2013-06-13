@@ -92,10 +92,7 @@ def main():
         if not 0 <= int(opts['--port']) < 65536:
             raise ValueError('Bad port number: "%d"' % port)
 
-        for prefix in ('server:', 'derive:'):
-            if config.has_section(prefix + opts['SERVER']):
-                break
-        else:
+        if not config.has_section('server:' + opts['SERVER']):
             raise ValueError("No such server: '%s'" % opts['SERVER'])
     except ValueError, exc:
         print >> sys.stderr, str(exc)

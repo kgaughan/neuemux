@@ -18,7 +18,7 @@ def load_configuration(defaults=None, config_path=None):
     """
     Load configuration.
     """
-    config = ConfigParser.SafeConfigParser()
+    config = ConfigParser.RawConfigParser()
 
     # Defaults, if any.
     if defaults is not None:

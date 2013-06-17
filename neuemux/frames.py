@@ -2,6 +2,8 @@
 Support for basic EPP frame construction and parsing.
 """
 
+import uuid
+
 from neuemux import xmlutils
 
 
@@ -12,18 +14,14 @@ HELLO = (
     '<epp xmlns="urn:ietf:params:xml:ns:epp-1.0"><hello/></epp>'
 )
 
-LOGOUT = (
-    '<?xml version="1.0" encoding="UTF-8"?>'
-    '<epp xmlns="urn:ietf:params:xml:ns:epp-1.0">'
-    '<command><logout/><clTRID>neuemux-logout</clTRID></command>'
-    '</epp>'
-)
 
-
-def login(uname, pwd, objs=(), exts=(), lang='en'):
+def login(uname, pwd, objs=(), exts=(), lang='en', trid=None):
     """
     Construct a login frame.
     """
+    if trid is None:
+        trid = uuid.uuid1()
+
     xml = xmlutils.XMLBuilder()
     with xml.within('epp', xmlns=ROOT):
         with xml.within('command'):
@@ -39,5 +37,20 @@ def login(uname, pwd, objs=(), exts=(), lang='en'):
                     with xml.within('svcExtension'):
                         for ext in exts:
                             xml.tag('extURI', ext)
-            xml.tag('clTRID', 'neuemux-login')
+            xml.tag('clTRID', trid)
+    return xml.as_string()
+
+
+def logout(trid=None):
+    """
+    Construct a logout frame.
+    """
+    if trid is None:
+        trid = uuid.uuid1()
+
+    xml = xmlutils.XMLBuilder()
+    with xml.within('epp', xmlns=ROOT):
+        with xml.within('command'):
+            xml.tag('logout')
+            xml.tag('clTRID', trid)
     return xml.as_string()

@@ -2,23 +2,20 @@
 
 from __future__ import with_statement
 
+import buildkit
 from setuptools import setup, find_packages
-from buildkit import *
-
-
-META = get_metadata('neuemux/version.py')
 
 
 setup(
     name='neuemux',
-    version=META['version'],
+    version='0.1.0',
     description='EPP reverse proxy daemons',
-    long_description=read('README'),
+    long_description=buildkit.read('README'),
     url='https://github.com/kgaughan/neuemux/',
     license='MIT',
     packages=find_packages(exclude='tests'),
     zip_safe=False,
-    install_requires=read_requirements('requirements.txt'),
+    install_requires=buildkit.read_requirements('requirements.txt'),
     include_package_data=True,
 
     entry_points={
@@ -39,6 +36,6 @@ setup(
         'Topic :: System :: Networking',
     ],
 
-    author=META['author'],
-    author_email=META['email']
+    author='Keith Gaughan',
+    author_email='k@stereochro.me',
 )

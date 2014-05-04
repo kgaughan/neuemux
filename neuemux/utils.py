@@ -13,6 +13,12 @@ try:
 except ImportError:
     import StringIO as stringio
 
+import pkg_resources
+
+
+def get_version():
+    pkg_resources.get_distribution('neuemux').version
+
 
 def load_configuration(defaults=None, config_path=None):
     """

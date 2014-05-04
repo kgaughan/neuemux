@@ -17,7 +17,6 @@ import docopt
 import ipaddr
 
 from neuemux import protocols, utils
-from neuemux.version import __version__
 
 
 USAGE = """
@@ -71,7 +70,7 @@ def main():
     """
     Execute the daemon.
     """
-    opts = docopt.docopt(USAGE, sys.argv[1:], version=__version__)
+    opts = docopt.docopt(USAGE, sys.argv[1:], version=utils.get_version())
 
     if not os.path.isfile(opts['--config']):
         print >> sys.stderr, "Configuration not found: %s" % opts['--config']

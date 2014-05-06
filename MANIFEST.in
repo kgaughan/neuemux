@@ -1,2 +1,2 @@
-include LICENSE ChangeLog buildkit.py requirements.txt
+include LICENSE ChangeLog requirements.txt
 recursive-include extra *.ini

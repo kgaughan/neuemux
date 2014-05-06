@@ -1,3 +1,4 @@
+=======
 neuemux
 =======
 
@@ -7,11 +8,11 @@ It will be able to manage multiple connections to multiple downstream EPP
 servers, while allowing connection sharing by clients to allow them to use a
 single connection to talk to multiple downstream EPP servers.
 
-It will also be bundled with a simpler reverse proxy to manage a connection to
-a single downstream server.
+It will also be bundled with a simpler reverse proxy to manage a connection
+to a single downstream server.
 
 It will also contain the ability to insert 'shims' at various points in the
-pipeline to simplify client development and to work around issues in EPP server
-implementations.
+pipeline to simplify client development and to work around issues in EPP
+server implementations.
 
 .. _EPP: http://tools.ietf.org/html/rfc5730

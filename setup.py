@@ -2,21 +2,45 @@
 
 from __future__ import with_statement
 
-import buildkit
+import os.path
+
 from setuptools import setup, find_packages
+
+
+def read(filename):
+    """
+    Read files relative to this file.
+    """
+    full_path = os.path.join(os.path.dirname(__file__), filename)
+    with open(full_path, 'r') as fh:
+        return fh.read()
+
+
+def read_requirements(requirements_path):
+    """
+    Read a requirements file, stripping out the detritus.
+    """
+    requirements = []
+    with open(requirements_path, 'r') as fh:
+        for line in fh:
+            line = line.strip()
+            if line != '' and not line.startswith(('#', 'git+')):
+                requirements.append(line)
+    return requirements
 
 
 setup(
     name='neuemux',
     version='0.1.0',
     description='EPP reverse proxy daemons',
-    long_description=buildkit.read('README'),
+    long_description=read('README') + "\n" + read('ChangeLog'),
     url='https://github.com/kgaughan/neuemux/',
     license='MIT',
     packages=find_packages(exclude='tests'),
     zip_safe=False,
-    install_requires=buildkit.read_requirements('requirements.txt'),
+    install_requires=read_requirements('requirements.txt'),
     include_package_data=True,
+    test_suite='tests',
 
     entry_points={
         'console_scripts': [

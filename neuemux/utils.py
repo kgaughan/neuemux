@@ -59,7 +59,7 @@ def get_nested_config(config, prefix, name):
     walked = set()
     result = {}
     while name is not None:
-        section = prefix + ':' + name
+        section = f'{prefix}:{name}'
         walked.add(name)
         next_name = None
         for key, value in config.items(section):

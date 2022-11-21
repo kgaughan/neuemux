@@ -50,8 +50,7 @@ class Channel(asyncore.dispatcher):
         self.remaining = _HEADER.size
 
     def handle_read(self):
-        chunk = self.recv(self.remaining)
-        if chunk:
+        if chunk := self.recv(self.remaining):
             self.remaining -= len(chunk)
             self.read_buffer.append(chunk)
             if self.remaining == 0:
